@@ -1,9 +1,12 @@
 import streamlit as st
 import google.generativeai as genai
+import requests
+import json
 import re
 from urllib.parse import urlparse
 from PIL import Image
 import io
+import base64
 
 # Configuração da página
 st.set_page_config(
@@ -106,6 +109,16 @@ with st.sidebar:
     """)
     
     st.markdown("---")
+    st.markdown("**🤖 Escolha a IA**")
+    
+    # Seletor de API
+    api_escolhida = st.selectbox(
+        "Qual API usar?",
+        ["🔷 Google Gemini", "🔶 DeepSeek"],
+        help="Escolha qual inteligência artificial deseja usar para análise"
+    )
+    
+    st.markdown("---")
     st.markdown("**⚙️ Modo de Análise**")
     
     modo_analise = st.radio(
@@ -115,27 +128,62 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.markdown("**⚙️ Configuração da API**")
+    st.markdown("**🔑 Configuração das APIs**")
     
-    # Tentar obter API Key dos secrets
+    # Variáveis para as chaves
+    google_api_key = None
+    deepseek_api_key = None
+    
+    # Tentar obter as API Keys dos secrets
     try:
-        api_key = st.secrets["GOOGLE_API_KEY"]
-        st.success("✅ API Key configurada!")
-        st.caption("🤖 Gemini AI (modelo detectado automaticamente)")
-    except (KeyError, FileNotFoundError):
-        st.warning("⚠️ API Key não encontrada")
-        st.info("Configure `.streamlit/secrets.toml`")
+        google_api_key = st.secrets.get("GOOGLE_API_KEY", None)
+        deepseek_api_key = st.secrets.get("DEEPSEEK_API_KEY", None)
         
-        # Fallback: permitir inserir manualmente
-        api_key = st.text_input(
-            "Ou insira manualmente:",
-            type="password",
-            help="https://aistudio.google.com/app/apikey"
-        )
+        if google_api_key:
+            st.success("✅ Google Gemini configurado")
+        if deepseek_api_key:
+            st.success("✅ DeepSeek configurado")
+            
+        if not google_api_key and not deepseek_api_key:
+            st.warning("⚠️ Nenhuma API configurada nos secrets")
+            
+    except (KeyError, FileNotFoundError, AttributeError):
+        st.warning("⚠️ Arquivo secrets.toml não encontrado")
+    
+    # Verificar qual API está sendo usada e se está configurada
+    if api_escolhida == "🔷 Google Gemini":
+        if not google_api_key:
+            st.info("🔷 Configure a Google API Key")
+            google_api_key = st.text_input(
+                "Google API Key:",
+                type="password",
+                help="https://aistudio.google.com/app/apikey",
+                key="google_manual"
+            )
+        else:
+            st.caption("🤖 Usando Gemini AI")
         
-        if api_key:
-            st.success("✅ API Key configurada!")
-            st.caption("🤖 Gemini AI")
+        api_key = google_api_key
+        
+    else:  # DeepSeek
+        if not deepseek_api_key:
+            st.info("🔶 Configure a DeepSeek API Key")
+            deepseek_api_key = st.text_input(
+                "DeepSeek API Key:",
+                type="password",
+                help="https://platform.deepseek.com/api_keys",
+                key="deepseek_manual"
+            )
+        else:
+            st.caption("🤖 Usando DeepSeek AI")
+        
+        api_key = deepseek_api_key
+    
+    # Status da configuração
+    if api_key:
+        st.success(f"✅ {api_escolhida} pronto para usar!")
+    else:
+        st.error("⚠️ Insira a API Key para continuar")
     
     st.markdown("---")
     st.markdown("**📊 FATEC**")
@@ -401,6 +449,68 @@ def criar_prompt(mensagem, origem, modo_analise, info_urls=""):
     """
     return prompt
 
+# Função para analisar com DeepSeek
+def analisar_com_deepseek(mensagem, origem, api_key, modo_analise, imagem=None, verificar_urls=True, info_urls=""):
+    """Analisa mensagem usando a API do DeepSeek"""
+    try:
+        # Criar o prompt
+        prompt = criar_prompt(mensagem if mensagem else "[IMAGEM FORNECIDA - ANALISE O CONTEÚDO VISUAL]", 
+                             origem, modo_analise, info_urls)
+        
+        # Preparar mensagens
+        messages = []
+        
+        if imagem:
+            # Converter imagem para base64
+            image_data = Image.open(imagem)
+            buffered = io.BytesIO()
+            image_data.save(buffered, format="PNG")
+            img_base64 = base64.b64encode(buffered.getvalue()).decode()
+            
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_base64}"}}
+                ]
+            })
+        else:
+            messages.append({
+                "role": "user",
+                "content": prompt
+            })
+        
+        # Fazer requisição para DeepSeek
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "deepseek-chat",
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 4000
+        }
+        
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            texto_resposta = result['choices'][0]['message']['content']
+            texto_resposta += f"\n\n---\n\n*Análise realizada com: DeepSeek Chat*"
+            return texto_resposta
+        else:
+            return f"❌ Erro DeepSeek (código {response.status_code}): {response.text}"
+            
+    except Exception as e:
+        return f"❌ Erro ao usar DeepSeek: {str(e)}\n\nVerifique se sua API Key está correta."
+
 # Função para analisar a mensagem com Gemini (com suporte a imagens)
 def analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem=None, verificar_urls=True):
     try:
@@ -567,11 +677,33 @@ if analisar:
             status_text.text("🔍 Verificando URLs...")
             progress_bar.progress(40)
         
-        status_text.text("🧠 Processando com IA Gemini...")
+        # Definir qual IA está sendo usada
+        nome_ia = "Google Gemini" if api_escolhida == "🔷 Google Gemini" else "DeepSeek"
+        status_text.text(f"🧠 Processando com {nome_ia}...")
         progress_bar.progress(60)
         
-        # Realizar análise
-        resultado = analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem, verificar_urls)
+        # Realizar análise com a API escolhida
+        if api_escolhida == "🔷 Google Gemini":
+            resultado = analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem, verificar_urls)
+        else:  # DeepSeek
+            # Fazer análise de URLs primeiro se necessário
+            info_urls = ""
+            if verificar_urls and mensagem:
+                urls = extrair_urls(mensagem)
+                if urls:
+                    info_urls = "\n🔗 URLS ENCONTRADAS E PRÉ-ANÁLISE:\n"
+                    for url in urls:
+                        info_urls += f"\n📍 URL: {url}\n"
+                        problemas = analisar_url(url)
+                        if problemas:
+                            info_urls += "   ALERTAS:\n"
+                            for problema in problemas:
+                                info_urls += f"   - {problema}\n"
+                        else:
+                            info_urls += "   ✅ Nenhum problema óbvio detectado\n"
+                    info_urls += "\n"
+            
+            resultado = analisar_com_deepseek(mensagem, origem, api_key, modo_analise, imagem, verificar_urls, info_urls)
         
         progress_bar.progress(100)
         status_text.text("✅ Análise concluída!")
@@ -611,17 +743,20 @@ if analisar:
         # Informações adicionais
         st.markdown("---")
         
-        col_info1, col_info2, col_info3 = st.columns(3)
+        col_info1, col_info2, col_info3, col_info4 = st.columns(4)
         
         with col_info1:
-            st.metric("🎯 Modo de Análise", modo_analise)
+            st.metric("🤖 IA Utilizada", api_escolhida.replace("🔷 ", "").replace("🔶 ", ""))
         
         with col_info2:
-            st.metric("📱 Origem", origem)
+            st.metric("🎯 Modo", modo_analise.split()[1] if len(modo_analise.split()) > 1 else modo_analise)
         
         with col_info3:
+            st.metric("📱 Origem", origem)
+        
+        with col_info4:
             tipo_entrada = "Texto" if mensagem and not imagem else "Imagem" if imagem and not mensagem else "Texto + Imagem"
-            st.metric("📄 Tipo de Entrada", tipo_entrada)
+            st.metric("📄 Entrada", tipo_entrada)
         
         # Botões de ação
         st.markdown("---")
