@@ -1,5 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
+from openai import OpenAI
 import requests
 import json
 import re
@@ -114,7 +115,7 @@ with st.sidebar:
     # Seletor de API
     api_escolhida = st.selectbox(
         "Qual API usar?",
-        ["🔷 Google Gemini", "🔶 DeepSeek"],
+        ["🔷 Google Gemini", "🔶 DeepSeek", "🟢 ChatGPT (OpenAI)"],
         help="Escolha qual inteligência artificial deseja usar para análise"
     )
     
@@ -133,18 +134,26 @@ with st.sidebar:
     # Variáveis para as chaves
     google_api_key = None
     deepseek_api_key = None
+    openai_api_key = None
     
     # Tentar obter as API Keys dos secrets
     try:
         google_api_key = st.secrets.get("GOOGLE_API_KEY", None)
         deepseek_api_key = st.secrets.get("DEEPSEEK_API_KEY", None)
+        openai_api_key = st.secrets.get("OPENAI_API_KEY", None)
         
+        apis_configuradas = []
         if google_api_key:
-            st.success("✅ Google Gemini configurado")
+            apis_configuradas.append("✅ Google Gemini")
         if deepseek_api_key:
-            st.success("✅ DeepSeek configurado")
+            apis_configuradas.append("✅ DeepSeek")
+        if openai_api_key:
+            apis_configuradas.append("✅ ChatGPT")
             
-        if not google_api_key and not deepseek_api_key:
+        if apis_configuradas:
+            for api in apis_configuradas:
+                st.success(api)
+        else:
             st.warning("⚠️ Nenhuma API configurada nos secrets")
             
     except (KeyError, FileNotFoundError, AttributeError):
@@ -165,7 +174,7 @@ with st.sidebar:
         
         api_key = google_api_key
         
-    else:  # DeepSeek
+    elif api_escolhida == "🔶 DeepSeek":
         if not deepseek_api_key:
             st.info("🔶 Configure a DeepSeek API Key")
             deepseek_api_key = st.text_input(
@@ -178,6 +187,20 @@ with st.sidebar:
             st.caption("🤖 Usando DeepSeek AI")
         
         api_key = deepseek_api_key
+        
+    else:  # ChatGPT
+        if not openai_api_key:
+            st.info("🟢 Configure a OpenAI API Key")
+            openai_api_key = st.text_input(
+                "OpenAI API Key:",
+                type="password",
+                help="https://platform.openai.com/api-keys",
+                key="openai_manual"
+            )
+        else:
+            st.caption("🤖 Usando ChatGPT (GPT-4)")
+        
+        api_key = openai_api_key
     
     # Status da configuração
     if api_key:
@@ -449,6 +472,79 @@ def criar_prompt(mensagem, origem, modo_analise, info_urls=""):
     """
     return prompt
 
+# Função para analisar com ChatGPT (OpenAI)
+def analisar_com_chatgpt(mensagem, origem, api_key, modo_analise, imagem=None, verificar_urls=True, info_urls=""):
+    """Analisa mensagem usando a API do ChatGPT (OpenAI)"""
+    try:
+        # Configurar cliente OpenAI
+        client = OpenAI(api_key=api_key)
+        
+        # Criar o prompt
+        prompt = criar_prompt(mensagem if mensagem else "[IMAGEM FORNECIDA - ANALISE O CONTEÚDO VISUAL]", 
+                             origem, modo_analise, info_urls)
+        
+        # Preparar mensagens
+        messages = []
+        
+        if imagem:
+            # Converter imagem para base64
+            image_data = Image.open(imagem)
+            buffered = io.BytesIO()
+            image_data.save(buffered, format="PNG")
+            img_base64 = base64.b64encode(buffered.getvalue()).decode()
+            
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{img_base64}"
+                        }
+                    }
+                ]
+            })
+            
+            # Usar GPT-4 Vision para imagens
+            modelo = "gpt-4o"
+        else:
+            messages.append({
+                "role": "user",
+                "content": prompt
+            })
+            
+            # Usar GPT-4 para texto
+            modelo = "gpt-4o"
+        
+        # Fazer requisição
+        response = client.chat.completions.create(
+            model=modelo,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=4000
+        )
+        
+        texto_resposta = response.choices[0].message.content
+        texto_resposta += f"\n\n---\n\n*Análise realizada com: {modelo.upper()}*"
+        return texto_resposta
+        
+    except Exception as e:
+        erro_msg = str(e)
+        if "insufficient_quota" in erro_msg or "billing" in erro_msg.lower():
+            return """❌ **Erro: Quota/Créditos Insuficientes**
+
+Sua conta OpenAI não tem créditos suficientes.
+
+**Soluções:**
+1. Adicione créditos em: https://platform.openai.com/account/billing
+2. Verifique seu plano atual
+3. Use outra API (Google Gemini ou DeepSeek)
+
+**Erro:** """ + erro_msg
+        else:
+            return f"❌ Erro ao usar ChatGPT: {erro_msg}\n\nVerifique se sua API Key está correta."
+
 # Função para analisar com DeepSeek
 def analisar_com_deepseek(mensagem, origem, api_key, modo_analise, imagem=None, verificar_urls=True, info_urls=""):
     """Analisa mensagem usando a API do DeepSeek"""
@@ -678,14 +774,21 @@ if analisar:
             progress_bar.progress(40)
         
         # Definir qual IA está sendo usada
-        nome_ia = "Google Gemini" if api_escolhida == "🔷 Google Gemini" else "DeepSeek"
+        if api_escolhida == "🔷 Google Gemini":
+            nome_ia = "Google Gemini"
+        elif api_escolhida == "🔶 DeepSeek":
+            nome_ia = "DeepSeek"
+        else:
+            nome_ia = "ChatGPT"
+            
         status_text.text(f"🧠 Processando com {nome_ia}...")
         progress_bar.progress(60)
         
         # Realizar análise com a API escolhida
         if api_escolhida == "🔷 Google Gemini":
             resultado = analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem, verificar_urls)
-        else:  # DeepSeek
+            
+        elif api_escolhida == "🔶 DeepSeek":
             # Fazer análise de URLs primeiro se necessário
             info_urls = ""
             if verificar_urls and mensagem:
@@ -704,6 +807,26 @@ if analisar:
                     info_urls += "\n"
             
             resultado = analisar_com_deepseek(mensagem, origem, api_key, modo_analise, imagem, verificar_urls, info_urls)
+            
+        else:  # ChatGPT
+            # Fazer análise de URLs primeiro se necessário
+            info_urls = ""
+            if verificar_urls and mensagem:
+                urls = extrair_urls(mensagem)
+                if urls:
+                    info_urls = "\n🔗 URLS ENCONTRADAS E PRÉ-ANÁLISE:\n"
+                    for url in urls:
+                        info_urls += f"\n📍 URL: {url}\n"
+                        problemas = analisar_url(url)
+                        if problemas:
+                            info_urls += "   ALERTAS:\n"
+                            for problema in problemas:
+                                info_urls += f"   - {problema}\n"
+                        else:
+                            info_urls += "   ✅ Nenhum problema óbvio detectado\n"
+                    info_urls += "\n"
+            
+            resultado = analisar_com_chatgpt(mensagem, origem, api_key, modo_analise, imagem, verificar_urls, info_urls)
         
         progress_bar.progress(100)
         status_text.text("✅ Análise concluída!")
