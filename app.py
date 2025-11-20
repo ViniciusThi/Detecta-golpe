@@ -73,17 +73,23 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**⚙️ Configuração da API**")
     
-    # Campo para API Key
-    api_key = st.text_input(
-        "Google AI Studio API Key:",
-        type="password",
-        help="Obtenha sua chave gratuita em: https://aistudio.google.com/app/apikey"
-    )
-    
-    if api_key:
-        st.success("✅ API Key configurada!")
-    else:
-        st.warning("⚠️ Insira sua API Key para usar o app")
+    # Tentar obter API Key dos secrets
+    try:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        st.success("✅ API Key configurada via secrets!")
+    except (KeyError, FileNotFoundError):
+        st.warning("⚠️ API Key não encontrada nos secrets")
+        st.info("Configure o arquivo `.streamlit/secrets.toml` com sua chave")
+        
+        # Fallback: permitir inserir manualmente
+        api_key = st.text_input(
+            "Ou insira sua API Key manualmente:",
+            type="password",
+            help="Obtenha sua chave gratuita em: https://aistudio.google.com/app/apikey"
+        )
+        
+        if api_key:
+            st.success("✅ API Key manual configurada!")
     
     st.markdown("---")
     st.markdown("**📊 Desenvolvido para FATEC**")
