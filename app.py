@@ -409,7 +409,7 @@ def analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem=None, veri
         
         # Tentar usar modelos disponíveis em ordem de preferência
         modelos_disponiveis = [
-            'gemini-1.5-flash',  # Modelo mais recente e acessível
+            'gemini-2.5-flash',  # Modelo mais recente e acessível
             'gemini-pro-vision', # Para análise de imagens
             'gemini-pro',        # Modelo padrão
             'gemini-1.5-pro'     # Caso esteja disponível
