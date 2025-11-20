@@ -81,6 +81,34 @@ Para fazer deploy no Streamlit Cloud:
    - Vá em "Settings" > "Secrets"
    - Cole o conteúdo do seu `secrets.toml`
 
+## 🔧 Solução de Problemas
+
+Se encontrar erros como "404 model not found" ou problemas com a API:
+
+1. **Gere uma NOVA API Key** em: https://aistudio.google.com/app/apikey
+2. Atualize o arquivo `.streamlit/secrets.toml`
+3. Reinicie a aplicação
+
+📚 **Guia completo:** Veja o arquivo [TROUBLESHOOTING.md](TROUBLESHOOTING.md) para soluções detalhadas
+
+## 🤖 Modelos de IA Utilizados
+
+O app detecta automaticamente o melhor modelo disponível:
+- ⚡ **Gemini 1.5 Flash** (preferencial - rápido e poderoso)
+- 🖼️ **Gemini Pro Vision** (para imagens)
+- 📝 **Gemini Pro** (padrão)
+
+## 🆕 Recursos Avançados
+
+- ✅ Análise multimodal (texto + imagem)
+- ✅ 3 níveis de rigor (Padrão, Rigoroso, Máximo)
+- ✅ Verificação automática de URLs suspeitas
+- ✅ Score de confiança (0-100%)
+- ✅ Detecção de padrões de phishing
+- ✅ Análise forense detalhada
+- ✅ Relatório exportável
+- ✅ Links para denúncia oficial
+
 ## 👨‍💻 Desenvolvido para FATEC
 
 Projeto de Engenharia de Machine Learning

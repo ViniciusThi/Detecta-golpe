@@ -1,0 +1,41 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                   🚀 SOLUÇÃO RÁPIDA - ERRO 404                ║
+╚═══════════════════════════════════════════════════════════════╝
+
+SE VOCÊ ESTÁ VENDO O ERRO:
+"404 models/gemini-1.5-pro is not found"
+
+➡️  FAÇA ISSO AGORA:
+
+1️⃣  ABRA: https://aistudio.google.com/app/apikey
+
+2️⃣  CLIQUE em "Create API Key" (botão azul)
+
+3️⃣  COPIE a chave completa (começa com AIzaSy...)
+
+4️⃣  ABRA o arquivo: .streamlit/secrets.toml
+
+5️⃣  COLE sua chave:
+    GOOGLE_API_KEY = "AIzaSy... sua chave aqui ..."
+
+6️⃣  SALVE o arquivo
+
+7️⃣  PARE o Streamlit (Ctrl+C no terminal)
+
+8️⃣  INICIE novamente:
+    streamlit run app.py
+
+✅  PRONTO! O app agora detectará automaticamente o modelo disponível
+    e usará gemini-1.5-flash (mais rápido e moderno)
+
+═══════════════════════════════════════════════════════════════
+
+💡 DICA: APIs antigas podem não ter acesso aos modelos novos.
+         SEMPRE gere uma chave NOVA para garantir acesso total!
+
+═══════════════════════════════════════════════════════════════
+
+📚 Mais detalhes: Veja TROUBLESHOOTING.md
+
+🔗 Obter API Key: https://aistudio.google.com/app/apikey
+

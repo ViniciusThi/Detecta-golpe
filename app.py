@@ -121,7 +121,7 @@ with st.sidebar:
     try:
         api_key = st.secrets["GOOGLE_API_KEY"]
         st.success("✅ API Key configurada!")
-        st.caption("Usando Gemini 1.5 Pro")
+        st.caption("🤖 Gemini AI (modelo detectado automaticamente)")
     except (KeyError, FileNotFoundError):
         st.warning("⚠️ API Key não encontrada")
         st.info("Configure `.streamlit/secrets.toml`")
@@ -135,6 +135,7 @@ with st.sidebar:
         
         if api_key:
             st.success("✅ API Key configurada!")
+            st.caption("🤖 Gemini AI")
     
     st.markdown("---")
     st.markdown("**📊 FATEC**")
@@ -406,8 +407,38 @@ def analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem=None, veri
         # Configurar a API
         genai.configure(api_key=api_key)
         
-        # Usar modelo PRO para análise mais rigorosa
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        # Tentar usar modelos disponíveis em ordem de preferência
+        modelos_disponiveis = [
+            'gemini-1.5-flash',  # Modelo mais recente e acessível
+            'gemini-pro-vision', # Para análise de imagens
+            'gemini-pro',        # Modelo padrão
+            'gemini-1.5-pro'     # Caso esteja disponível
+        ]
+        
+        model = None
+        modelo_usado = None
+        
+        # Se tiver imagem, priorizar modelos com visão
+        if imagem:
+            for modelo_nome in ['gemini-1.5-flash', 'gemini-pro-vision']:
+                try:
+                    model = genai.GenerativeModel(modelo_nome)
+                    modelo_usado = modelo_nome
+                    break
+                except:
+                    continue
+        else:
+            # Sem imagem, usar qualquer modelo de texto
+            for modelo_nome in ['gemini-1.5-flash', 'gemini-pro']:
+                try:
+                    model = genai.GenerativeModel(modelo_nome)
+                    modelo_usado = modelo_nome
+                    break
+                except:
+                    continue
+        
+        if not model:
+            return "❌ Erro: Nenhum modelo Gemini disponível. Verifique sua API Key."
         
         # Análise de URLs se habilitado
         info_urls = ""
@@ -431,6 +462,8 @@ def analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem=None, veri
                              origem, modo_analise, info_urls)
         
         # Preparar conteúdo para análise
+        resultado_texto = ""
+        
         if imagem:
             # Processar imagem
             image_data = Image.open(imagem)
@@ -449,9 +482,72 @@ def analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem=None, veri
             # Só texto
             response = model.generate_content(prompt)
         
-        return response.text
+        resultado_texto = response.text
+        
+        # Adicionar informação do modelo usado
+        resultado_texto += f"\n\n---\n\n*Análise realizada com: {modelo_usado}*"
+        
+        return resultado_texto
+        
     except Exception as e:
-        return f"❌ Erro ao analisar: {str(e)}\n\nVerifique se sua API Key está correta e se o modelo Gemini 1.5 Pro está disponível."
+        erro_msg = str(e)
+        
+        # Mensagens de erro mais amigáveis
+        if "404" in erro_msg or "not found" in erro_msg:
+            return """❌ **Erro: Modelo não disponível**
+
+O modelo Gemini não está acessível no momento. Possíveis soluções:
+
+1. **Verifique sua API Key:**
+   - Acesse: https://aistudio.google.com/app/apikey
+   - Confirme se a chave está ativa
+
+2. **Gere uma nova API Key:**
+   - Às vezes chaves antigas não têm acesso aos modelos mais recentes
+   - Crie uma nova e atualize o arquivo `secrets.toml`
+
+3. **Aguarde alguns minutos:**
+   - Às vezes a API do Google pode estar temporariamente indisponível
+
+4. **Verifique sua conta:**
+   - Algumas contas podem ter restrições regionais ou de quota
+
+**Detalhes do erro técnico:**
+```
+""" + erro_msg + """
+```
+
+💡 **Dica:** Tente gerar uma nova API Key em https://aistudio.google.com/app/apikey"""
+        
+        elif "quota" in erro_msg.lower() or "limit" in erro_msg.lower():
+            return f"""❌ **Erro: Limite de uso atingido**
+
+Você atingiu o limite de requisições da sua API Key.
+
+**Soluções:**
+- Aguarde alguns minutos e tente novamente
+- Verifique seus limites em: https://aistudio.google.com/
+- Considere gerar uma nova API Key
+
+**Erro:** {erro_msg}"""
+        
+        else:
+            return f"""❌ **Erro ao processar análise**
+
+Ocorreu um erro inesperado durante a análise.
+
+**Detalhes:**
+```
+{erro_msg}
+```
+
+**Possíveis soluções:**
+1. Verifique sua conexão com a internet
+2. Confirme se sua API Key está correta
+3. Tente novamente em alguns instantes
+4. Se o erro persistir, gere uma nova API Key
+
+🔗 Obtenha/renove sua API Key: https://aistudio.google.com/app/apikey"""
 
 # Processar análise quando o botão for clicado
 if analisar:
@@ -471,7 +567,7 @@ if analisar:
             status_text.text("🔍 Verificando URLs...")
             progress_bar.progress(40)
         
-        status_text.text("🧠 Processando com IA (Gemini Pro)...")
+        status_text.text("🧠 Processando com IA Gemini...")
         progress_bar.progress(60)
         
         # Realizar análise
