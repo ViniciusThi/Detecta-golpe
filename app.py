@@ -408,12 +408,20 @@ def criar_prompt(mensagem, origem, modo_analise, info_urls=""):
     {config['criterios']}
     
     Forneça uma análise EXTREMAMENTE DETALHADA seguindo EXATAMENTE esta estrutura:
-
+    
+    ⚠️ CRÍTICO: O NÍVEL DE RISCO DEVE SER A PRIMEIRA COISA NA SUA RESPOSTA! ⚠️
+    
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    🎯 NÍVEL DE RISCO: [BAIXO | MÉDIO | ALTO | CRÍTICO]
+    🎯 NÍVEL DE RISCO: [ESCOLHA APENAS UM: BAIXO | MÉDIO | ALTO | CRÍTICO]
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     
     📊 SCORE DE CONFIANÇA: [0-100]% (0 = Golpe Certeza | 100 = Legítimo)
+    
+    IMPORTANTE: 
+    - O NÍVEL DE RISCO deve aparecer EXATAMENTE no formato acima, no início da resposta
+    - Use APENAS uma das opções: BAIXO, MÉDIO, ALTO ou CRÍTICO
+    - Seja CONSISTENTE: se você classificar como CRÍTICO, toda a análise deve refletir isso
+    - NÃO contradiga o nível de risco na análise - se é CRÍTICO, a análise deve ser crítica
     
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     🔍 ANÁLISE TÉCNICA DETALHADA
@@ -845,22 +853,66 @@ if analisar:
         st.markdown("## 📊 RELATÓRIO DE ANÁLISE COMPLETO")
         st.markdown("---")
         
-        # Extrair e exibir nível de risco
+        # Extrair e exibir nível de risco - busca mais precisa
         resultado_lower = resultado.lower()
         
-        # Buscar por diferentes padrões de risco
-        if "crítico" in resultado_lower[:500]:
+        # Buscar padrões específicos de nível de risco no texto completo
+        # Priorizar busca por "nível de risco:" ou "risco:" seguido do nível
+        nivel_risco = None
+        
+        # Padrões para encontrar o nível de risco explicitamente mencionado
+        import re
+        
+        # Buscar por padrão "NÍVEL DE RISCO: [NÍVEL]" ou "RISCO: [NÍVEL]"
+        padrao_risco = re.search(r'(?:nível\s+de\s+risco|risco)[:\s]+(crítico|alto|médio|medio|baixo)', resultado_lower, re.IGNORECASE)
+        if padrao_risco:
+            nivel_encontrado = padrao_risco.group(1).lower()
+            if nivel_encontrado in ['crítico', 'critico']:
+                nivel_risco = 'CRÍTICO'
+            elif nivel_encontrado == 'alto':
+                nivel_risco = 'ALTO'
+            elif nivel_encontrado in ['médio', 'medio']:
+                nivel_risco = 'MÉDIO'
+            elif nivel_encontrado == 'baixo':
+                nivel_risco = 'BAIXO'
+        
+        # Se não encontrou pelo padrão, buscar por palavras-chave no contexto
+        if not nivel_risco:
+            # Buscar nas primeiras 2000 caracteres (onde geralmente está o nível de risco)
+            texto_inicial = resultado_lower[:2000]
+            
+            # Prioridade: crítico > alto > médio > baixo
+            if 'crítico' in texto_inicial or 'critico' in texto_inicial:
+                # Verificar se não é um falso positivo (ex: "análise crítica")
+                if re.search(r'\b(risco|nível|nivel).*?(crítico|critico)', texto_inicial, re.IGNORECASE):
+                    nivel_risco = 'CRÍTICO'
+            elif 'alto' in texto_inicial:
+                if re.search(r'\b(risco|nível|nivel).*?alto', texto_inicial, re.IGNORECASE):
+                    nivel_risco = 'ALTO'
+            elif 'médio' in texto_inicial or 'medio' in texto_inicial:
+                if re.search(r'\b(risco|nível|nivel).*?(médio|medio)', texto_inicial, re.IGNORECASE):
+                    nivel_risco = 'MÉDIO'
+            elif 'baixo' in texto_inicial:
+                if re.search(r'\b(risco|nível|nivel).*?baixo', texto_inicial, re.IGNORECASE):
+                    nivel_risco = 'BAIXO'
+        
+        # Exibir o nível de risco detectado
+        if nivel_risco == 'CRÍTICO':
             st.markdown('<div class="risk-badge risk-high">🚨 RISCO CRÍTICO</div>', unsafe_allow_html=True)
             st.markdown('<div class="danger-box"><h3>🚨 ALERTA MÁXIMO</h3><p>Esta mensagem apresenta <strong>EVIDÊNCIAS CLARAS DE GOLPE/FRAUDE</strong>. NÃO interaja com ela!</p></div>', unsafe_allow_html=True)
-        elif "alto" in resultado_lower[:500]:
+        elif nivel_risco == 'ALTO':
             st.markdown('<div class="risk-badge risk-high">🔴 RISCO ALTO</div>', unsafe_allow_html=True)
             st.markdown('<div class="danger-box"><h3>⚠️ PERIGO</h3><p>Esta mensagem apresenta <strong>fortes indícios de golpe</strong>. Não clique em links e não forneça dados!</p></div>', unsafe_allow_html=True)
-        elif "médio" in resultado_lower[:500]:
+        elif nivel_risco == 'MÉDIO':
             st.markdown('<div class="risk-badge risk-medium">🟡 RISCO MÉDIO</div>', unsafe_allow_html=True)
             st.markdown('<div class="warning-box"><h3>⚠️ ATENÇÃO</h3><p>Esta mensagem apresenta <strong>elementos suspeitos</strong>. Proceda com cautela!</p></div>', unsafe_allow_html=True)
-        else:
+        elif nivel_risco == 'BAIXO':
             st.markdown('<div class="risk-badge risk-low">🟢 RISCO BAIXO</div>', unsafe_allow_html=True)
             st.info("✅ Análise indica menor probabilidade de golpe, mas mantenha sempre a vigilância!")
+        else:
+            # Se não conseguiu detectar, mostrar aviso genérico
+            st.markdown('<div class="risk-badge risk-medium">⚠️ ANÁLISE REALIZADA</div>', unsafe_allow_html=True)
+            st.warning("⚠️ Verifique o nível de risco na análise completa abaixo.")
         
         # Exibir resultado completo formatado
         st.markdown("---")
