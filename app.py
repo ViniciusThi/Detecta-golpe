@@ -90,8 +90,8 @@ st.markdown("---")
 with st.sidebar:
     st.header("ℹ️ Sobre o App")
     st.markdown("""
-    **Detecta Golpe** usa IA avançada (Google Gemini Pro) para análise 
-    profunda de mensagens e imagens suspeitas.
+    **Detecta Golpe** usa IA avançada (Google Gemini 2.5 Flash - Gratuito) 
+    para análise profunda de mensagens e imagens suspeitas.
     
     **Como usar:**
     1. Cole o texto OU faça upload de imagem
@@ -175,38 +175,46 @@ with st.sidebar:
         api_key = google_api_key
         
     elif api_escolhida == "🔶 DeepSeek":
+        st.warning("⚠️ **DeepSeek requer créditos pagos**\n\nPara usar DeepSeek, você precisa adicionar créditos em sua conta.\n\n💡 **Recomendação:** Use Google Gemini (gratuito) para testes.")
         if not deepseek_api_key:
             st.info("🔶 Configure a DeepSeek API Key")
             deepseek_api_key = st.text_input(
                 "DeepSeek API Key:",
                 type="password",
-                help="https://platform.deepseek.com/api_keys",
+                help="https://platform.deepseek.com/api_keys - Requer créditos pagos",
                 key="deepseek_manual"
             )
         else:
-            st.caption("🤖 Usando DeepSeek AI")
+            st.caption("🤖 Usando DeepSeek AI (requer créditos)")
         
         api_key = deepseek_api_key
         
     else:  # ChatGPT
+        st.warning("⚠️ **ChatGPT requer créditos pagos**\n\nPara usar ChatGPT, você precisa adicionar créditos em sua conta OpenAI.\n\n💡 **Recomendação:** Use Google Gemini (gratuito) para testes.")
         if not openai_api_key:
             st.info("🟢 Configure a OpenAI API Key")
             openai_api_key = st.text_input(
                 "OpenAI API Key:",
                 type="password",
-                help="https://platform.openai.com/api-keys",
+                help="https://platform.openai.com/api-keys - Requer créditos pagos",
                 key="openai_manual"
             )
         else:
-            st.caption("🤖 Usando ChatGPT (GPT-4)")
+            st.caption("🤖 Usando ChatGPT (GPT-4) - Requer créditos")
         
         api_key = openai_api_key
     
     # Status da configuração
     if api_key:
-        st.success(f"✅ {api_escolhida} pronto para usar!")
+        if api_escolhida == "🔷 Google Gemini":
+            st.success(f"✅ {api_escolhida} pronto para usar! (Gratuito)")
+        else:
+            st.success(f"✅ {api_escolhida} configurado (requer créditos)")
     else:
-        st.error("⚠️ Insira a API Key para continuar")
+        if api_escolhida == "🔷 Google Gemini":
+            st.error("⚠️ Insira a API Key do Google Gemini para continuar")
+        else:
+            st.error("⚠️ Insira a API Key e adicione créditos para continuar")
     
     st.markdown("---")
     st.markdown("**📊 FATEC**")
@@ -599,13 +607,36 @@ def analisar_com_deepseek(mensagem, origem, api_key, modo_analise, imagem=None, 
         if response.status_code == 200:
             result = response.json()
             texto_resposta = result['choices'][0]['message']['content']
-            texto_resposta += f"\n\n---\n\n*Análise realizada com: DeepSeek Chat*"
+            texto_resposta += f"\n\n---\n\n*Análise realizada com: DeepSeek Chat (Requer créditos)*"
             return texto_resposta
+        elif response.status_code == 402 or "insufficient" in response.text.lower() or "balance" in response.text.lower():
+            return """❌ **Erro: Créditos Insuficientes no DeepSeek**
+
+Sua conta DeepSeek não tem créditos suficientes.
+
+**Soluções:**
+1. Adicione créditos em: https://platform.deepseek.com/account/balance
+2. Verifique seu saldo atual
+3. Use Google Gemini (gratuito) como alternativa
+
+**Erro:** """ + response.text
         else:
-            return f"❌ Erro DeepSeek (código {response.status_code}): {response.text}"
+            return f"❌ Erro DeepSeek (código {response.status_code}): {response.text}\n\n💡 Lembre-se: DeepSeek requer créditos pagos. Use Google Gemini para testes gratuitos."
             
     except Exception as e:
-        return f"❌ Erro ao usar DeepSeek: {str(e)}\n\nVerifique se sua API Key está correta."
+        erro_msg = str(e)
+        if "insufficient" in erro_msg.lower() or "balance" in erro_msg.lower() or "quota" in erro_msg.lower():
+            return """❌ **Erro: Créditos Insuficientes no DeepSeek**
+
+Sua conta DeepSeek não tem créditos suficientes.
+
+**Soluções:**
+1. Adicione créditos em: https://platform.deepseek.com/account/balance
+2. Verifique seu saldo atual
+3. Use Google Gemini (gratuito) como alternativa
+
+**Erro:** """ + erro_msg
+        return f"❌ Erro ao usar DeepSeek: {erro_msg}\n\n💡 Lembre-se: DeepSeek requer créditos pagos. Verifique sua API Key e saldo."
 
 # Função para analisar a mensagem com Gemini (com suporte a imagens)
 def analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem=None, verificar_urls=True):
@@ -613,38 +644,10 @@ def analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem=None, veri
         # Configurar a API
         genai.configure(api_key=api_key)
         
-        # Tentar usar modelos disponíveis em ordem de preferência
-        modelos_disponiveis = [
-            'gemini-2.5-flash',  # Modelo mais recente e acessível
-            'gemini-pro-vision', # Para análise de imagens
-            'gemini-pro',        # Modelo padrão
-            'gemini-1.5-pro'     # Caso esteja disponível
-        ]
-        
-        model = None
-        modelo_usado = None
-        
-        # Se tiver imagem, priorizar modelos com visão
-        if imagem:
-            for modelo_nome in ['gemini-1.5-flash', 'gemini-pro-vision']:
-                try:
-                    model = genai.GenerativeModel(modelo_nome)
-                    modelo_usado = modelo_nome
-                    break
-                except:
-                    continue
-        else:
-            # Sem imagem, usar qualquer modelo de texto
-            for modelo_nome in ['gemini-1.5-flash', 'gemini-pro']:
-                try:
-                    model = genai.GenerativeModel(modelo_nome)
-                    modelo_usado = modelo_nome
-                    break
-                except:
-                    continue
-        
-        if not model:
-            return "❌ Erro: Nenhum modelo Gemini disponível. Verifique sua API Key."
+        # Usar APENAS gemini-2.5-flash (disponível gratuitamente em novembro 2025)
+        # Este modelo suporta texto e imagens
+        modelo_usado = 'gemini-2.5-flash'
+        model = genai.GenerativeModel(modelo_usado)
         
         # Análise de URLs se habilitado
         info_urls = ""
@@ -668,8 +671,6 @@ def analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem=None, veri
                              origem, modo_analise, info_urls)
         
         # Preparar conteúdo para análise
-        resultado_texto = ""
-        
         if imagem:
             # Processar imagem
             image_data = Image.open(imagem)
@@ -691,7 +692,7 @@ def analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem=None, veri
         resultado_texto = response.text
         
         # Adicionar informação do modelo usado
-        resultado_texto += f"\n\n---\n\n*Análise realizada com: {modelo_usado}*"
+        resultado_texto += f"\n\n---\n\n*Análise realizada com: {modelo_usado} (Gratuito)*"
         
         return resultado_texto
         
@@ -700,30 +701,32 @@ def analisar_mensagem(mensagem, origem, api_key, modo_analise, imagem=None, veri
         
         # Mensagens de erro mais amigáveis
         if "404" in erro_msg or "not found" in erro_msg:
-            return """❌ **Erro: Modelo não disponível**
+            return """❌ **Erro: Modelo gemini-2.5-flash não encontrado**
 
-O modelo Gemini não está acessível no momento. Possíveis soluções:
+O modelo `gemini-2.5-flash` não está disponível para sua API Key.
 
-1. **Verifique sua API Key:**
+**Soluções:**
+
+1. **Gere uma NOVA API Key (IMPORTANTE):**
    - Acesse: https://aistudio.google.com/app/apikey
-   - Confirme se a chave está ativa
+   - Clique em "Create API Key" para gerar uma chave nova
+   - Chaves antigas podem não ter acesso ao modelo mais recente
+   - Copie a nova chave e atualize no Streamlit Secrets
 
-2. **Gere uma nova API Key:**
-   - Às vezes chaves antigas não têm acesso aos modelos mais recentes
-   - Crie uma nova e atualize o arquivo `secrets.toml`
+2. **Verifique a data:**
+   - O modelo `gemini-2.5-flash` está disponível gratuitamente a partir de novembro de 2025
+   - Certifique-se de que sua conta tem acesso aos modelos mais recentes
 
 3. **Aguarde alguns minutos:**
    - Às vezes a API do Google pode estar temporariamente indisponível
-
-4. **Verifique sua conta:**
-   - Algumas contas podem ter restrições regionais ou de quota
 
 **Detalhes do erro técnico:**
 ```
 """ + erro_msg + """
 ```
 
-💡 **Dica:** Tente gerar uma nova API Key em https://aistudio.google.com/app/apikey"""
+💡 **Dica:** Sempre gere uma API Key NOVA para garantir acesso aos modelos mais recentes!
+🔗 Obter nova API Key: https://aistudio.google.com/app/apikey"""
         
         elif "quota" in erro_msg.lower() or "limit" in erro_msg.lower():
             return f"""❌ **Erro: Limite de uso atingido**
@@ -945,7 +948,7 @@ st.markdown("---")
 st.markdown("""
     <div style='text-align: center; color: #666; padding: 20px; background: #f8f9fa; border-radius: 10px;'>
         <h3 style='color: #333;'>🛡️ Detecta Golpe - Análise Avançada com IA</h3>
-        <p><strong>Powered by:</strong> Google Gemini 1.5 Pro | Streamlit | Python</p>
+        <p><strong>Powered by:</strong> Google Gemini 2.5 Flash (Gratuito) | Streamlit | Python</p>
         <p>🎓 <strong>Projeto FATEC</strong> - Engenharia de Machine Learning</p>
         <p style='font-size: 14px; margin-top: 15px;'>
             <em>⚠️ Este app é uma ferramenta auxiliar. Sempre use seu julgamento crítico e, em caso de dúvida, 
