@@ -77,6 +77,13 @@ st.markdown("""
         border-radius: 10px;
         padding: 15px;
         margin: 10px 0;
+        color: #000000;
+    }
+    .danger-box h3 {
+        color: #000000;
+    }
+    .danger-box p {
+        color: #000000;
     }
     </style>
 """, unsafe_allow_html=True)
