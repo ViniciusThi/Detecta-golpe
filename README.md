@@ -50,14 +50,14 @@ streamlit run app.py
 - Streamlit
 - Google Gemini 2.5 Flash (Gratuito)
 
-## 📝 Estrutura
+## 📝 Estrutura do Projeto
 
 ```
 Detecta-golpe/
 ├── app.py              # Aplicação principal
-├── requirements.txt     # Dependências
-├── .gitignore          # Arquivos ignorados
-└── README.md           # Este arquivo
+├── requirements.txt     # Dependências Python
+├── README.md           # Documentação
+└── .gitignore          # Arquivos ignorados pelo Git
 ```
 
 ## ⚠️ Importante
