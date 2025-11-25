@@ -1,8 +1,21 @@
 # 🛡️ Detecta Golpe
 
-Aplicação web que usa IA (Google Gemini) para identificar golpes e fraudes em mensagens.
+## O que é?
 
-## 🚀 Como Usar
+**Detecta Golpe** é uma aplicação web que usa Inteligência Artificial (Google Gemini) para identificar golpes, fraudes e tentativas de phishing em mensagens recebidas por WhatsApp, SMS, e-mail e outras plataformas.
+
+## Para que serve?
+
+O sistema analisa mensagens suspeitas e fornece:
+- 🎯 Nível de risco (BAIXO, MÉDIO, ALTO, CRÍTICO)
+- 🔍 Análise técnica detalhada
+- ⚠️ Identificação de red flags e padrões de golpe
+- 🛡️ Recomendações de segurança
+- 📊 Relatório completo exportável
+
+**Problema que resolve:** Milhões de pessoas recebem mensagens fraudulentas diariamente. Este app ajuda a identificar golpes antes que causem prejuízos financeiros ou roubo de dados.
+
+## Como usar?
 
 ### 1. Instalar dependências
 
@@ -36,36 +49,14 @@ Cole a API Key diretamente na interface do app.
 streamlit run app.py
 ```
 
-## 📋 Funcionalidades
+### 5. Usar o app
 
-- ✅ Análise de mensagens suspeitas com IA
-- ✅ Suporte a imagens (screenshots, prints)
-- ✅ Verificação automática de URLs
-- ✅ 3 níveis de análise (Padrão, Rigoroso, Máximo)
-- ✅ Relatório completo exportável
+1. Cole o texto suspeito OU faça upload de uma imagem
+2. Selecione a origem da mensagem (WhatsApp, SMS, etc.)
+3. Escolha o modo de análise (Padrão, Rigoroso ou Máximo)
+4. Clique em "ANALISAR"
+5. Leia o relatório completo com nível de risco e recomendações
 
-## 🔧 Tecnologias
+---
 
-- Python 3.8+
-- Streamlit
-- Google Gemini 2.5 Flash (Gratuito)
-
-## 📝 Estrutura do Projeto
-
-```
-Detecta-golpe/
-├── app.py              # Aplicação principal
-├── requirements.txt     # Dependências Python
-├── README.md           # Documentação
-└── .gitignore          # Arquivos ignorados pelo Git
-```
-
-## ⚠️ Importante
-
-- **NUNCA** commite sua API Key no Git
-- Use apenas o Google Gemini (gratuito) para testes
-- DeepSeek e ChatGPT requerem créditos pagos
-
-## 🎓 FATEC
-
-Projeto de Engenharia de Machine Learning
+**Projeto FATEC - Engenharia de Machine Learning**
